@@ -158,34 +158,34 @@ def load_character(character_name, save_directory="data/save_games"):
     try:
         with open(filename, 'r') as file:
             lines = file.readlines()
-        except Exception:
-            raise SaveFileCorruptedError('Could not read save file')
+    except Exception:
+        raise SaveFileCorruptedError('Could not read save file')
 
-        character = {}
+    character = {}
 
-        try:
-            for line in lines:
-                if ":" not in line:
-                    raise InvalidSaveDataError('Line not formed correctly in save file')
+    try:
+        for line in lines:
+            if ":" not in line:
+                raise InvalidSaveDataError('Line not formed correctly in save file')
 
-                key, value = line.strip().split(':, 1')
+            key, value = line.strip().split(':, 1')
 
-                #handling list fields
-                if key in ['INVENTORY', 'ACTIVE_QUESTS', 'COMPLETED_QUESTS']:
-                    character[key.lower()] = value.split(',') if value else []
-                else:
-                    character[key.lower()] = value
+            #handling list fields
+            if key in ['INVENTORY', 'ACTIVE_QUESTS', 'COMPLETED_QUESTS']:
+                character[key.lower()] = value.split(',') if value else []
+            else:
+                character[key.lower()] = value
 
-            #convert from str to int
-            numerated_fields = ['level', 'health', 'max_health', 'strength', 'magic', 'experience', 'gold']
-            for field in numeric_fields:
-                character[field] = int(character[field])
+        #convert from str to int
+        numerated_fields = ['level', 'health', 'max_health', 'strength', 'magic', 'experience', 'gold']
+        for field in numeric_fields:
+            character[field] = int(character[field])
 
-            validate_character_data(character)
-            return character
+        validate_character_data(character)
+        return character
 
-        except Exception as e:
-            raise InvalidSaveDataError(f'Invalid save file data {e}')
+    except Exception as e:
+        raise InvalidSaveDataError(f'Invalid save file data {e}')
 
 
 def list_saved_characters(save_directory="data/save_games"):
@@ -412,3 +412,4 @@ if __name__ == "__main__":
     #     print("Character not found")
     # except SaveFileCorruptedError:
     #     print("Save file corrupted")
+

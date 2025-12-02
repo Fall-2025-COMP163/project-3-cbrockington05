@@ -2,9 +2,9 @@
 COMP 163 - Project 3: Quest Chronicles
 Quest Handler Module - Starter Code
 
-Name: [Your Name Here]
+Name: [Cayden Brockington]
 
-AI Usage: [Document any AI assistance used]
+AI Usage: [Used ChatGPT to help format accept quest, complete quest, and display classes]
 
 This module handles quest management, dependencies, and completion.
 """
@@ -43,14 +43,45 @@ def accept_quest(character, quest_id, quest_data_dict):
         QuestRequirementsNotMetError if prerequisite not completed
         QuestAlreadyCompletedError if quest already done
     """
-    # TODO: Implement quest acceptance
+    # Initialize lists if they don't exist
+    if 'active_quests' not in character:
+        character['active_quests'] = []
+    if 'completed_quests' not in character:
+        character['completed_quests'] = []
+    
     # Check quest exists
-    # Check level requirement
-    # Check prerequisite (if not "NONE")
+    if quest_id not in quest_data_dict:
+        raise QuestNotFoundError(f"Quest '{quest_id}' not found")
+    
+    quest = quest_data_dict[quest_id]
+    
     # Check not already completed
+    if quest_id in character['completed_quests']:
+        raise QuestAlreadyCompletedError(f"Quest '{quest_id}' already completed")
+    
     # Check not already active
-    # Add to character['active_quests']
-    pass
+    if quest_id in character['active_quests']:
+        raise QuestAlreadyCompletedError(f"Quest '{quest_id}' already active")
+    
+    # Check level requirement
+    if character['level'] < quest['required_level']:
+        raise InsufficientLevelError(
+            f"Level {quest['required_level']} required (you are level {character['level']})"
+        )
+    
+    # Check prerequisite (if not "NONE")
+    prerequisite = quest.get('prerequisite', 'NONE')
+    if prerequisite != 'NONE':
+        if prerequisite not in character['completed_quests']:
+            raise QuestRequirementsNotMetError(
+                f"Must complete '{prerequisite}' first"
+            )
+    
+    # Add to active quests
+    character['active_quests'].append(quest_id)
+    
+    return True
+
 
 def complete_quest(character, quest_id, quest_data_dict):
     """
@@ -70,14 +101,45 @@ def complete_quest(character, quest_id, quest_data_dict):
         QuestNotFoundError if quest_id not in quest_data_dict
         QuestNotActiveError if quest not in active_quests
     """
-    # TODO: Implement quest completion
     # Check quest exists
+    if quest_id not in quest_data_dict:
+        raise QuestNotFoundError(f"Quest '{quest_id}' not found")
+    
     # Check quest is active
-    # Remove from active_quests
-    # Add to completed_quests
-    # Grant rewards (use character_manager.gain_experience and add_gold)
+    if quest_id not in character.get('active_quests', []):
+        raise QuestNotActiveError(f"Quest '{quest_id}' is not active")
+    
+    quest = quest_data_dict[quest_id]
+    
+    # Remove from active quests
+    character['active_quests'].remove(quest_id)
+    
+    # Add to completed quests
+    if 'completed_quests' not in character:
+        character['completed_quests'] = []
+    character['completed_quests'].append(quest_id)
+    
+    # Grant rewards
+    reward_xp = quest.get('reward_xp', 0)
+    reward_gold = quest.get('reward_gold', 0)
+    
+    # Add XP (use gain_experience if available, otherwise add directly)
+    try:
+        import character_manager
+        character_manager.gain_experience(character, reward_xp)
+    except:
+        character['experience'] = character.get('experience', 0) + reward_xp
+    
+    # Add gold
+    character['gold'] = character.get('gold', 0) + reward_gold
+    
     # Return reward summary
-    pass
+    return {
+        'quest_id': quest_id,
+        'xp_gained': reward_xp,
+        'gold_gained': reward_gold
+    }
+
 
 def abandon_quest(character, quest_id):
     """
@@ -86,8 +148,12 @@ def abandon_quest(character, quest_id):
     Returns: True if abandoned
     Raises: QuestNotActiveError if quest not active
     """
-    # TODO: Implement quest abandonment
-    pass
+    if quest_id not in character.get('active_quests', []):
+        raise QuestNotActiveError(f"Quest '{quest_id}' is not active")
+    
+    character['active_quests'].remove(quest_id)
+    return True
+
 
 def get_active_quests(character, quest_data_dict):
     """
@@ -95,10 +161,15 @@ def get_active_quests(character, quest_data_dict):
     
     Returns: List of quest dictionaries for active quests
     """
-    # TODO: Implement active quest retrieval
-    # Look up each quest_id in character['active_quests']
-    # Return list of full quest data dictionaries
-    pass
+    active_quest_ids = character.get('active_quests', [])
+    active_quests = []
+    
+    for quest_id in active_quest_ids:
+        if quest_id in quest_data_dict:
+            active_quests.append(quest_data_dict[quest_id])
+    
+    return active_quests
+
 
 def get_completed_quests(character, quest_data_dict):
     """
@@ -106,8 +177,15 @@ def get_completed_quests(character, quest_data_dict):
     
     Returns: List of quest dictionaries for completed quests
     """
-    # TODO: Implement completed quest retrieval
-    pass
+    completed_quest_ids = character.get('completed_quests', [])
+    completed_quests = []
+    
+    for quest_id in completed_quest_ids:
+        if quest_id in quest_data_dict:
+            completed_quests.append(quest_data_dict[quest_id])
+    
+    return completed_quests
+
 
 def get_available_quests(character, quest_data_dict):
     """
@@ -117,9 +195,14 @@ def get_available_quests(character, quest_data_dict):
     
     Returns: List of quest dictionaries
     """
-    # TODO: Implement available quest search
-    # Filter all quests by requirements
-    pass
+    available_quests = []
+    
+    for quest_id, quest in quest_data_dict.items():
+        if can_accept_quest(character, quest_id, quest_data_dict):
+            available_quests.append(quest)
+    
+    return available_quests
+
 
 # ============================================================================
 # QUEST TRACKING
@@ -131,8 +214,8 @@ def is_quest_completed(character, quest_id):
     
     Returns: True if completed, False otherwise
     """
-    # TODO: Implement completion check
-    pass
+    return quest_id in character.get('completed_quests', [])
+
 
 def is_quest_active(character, quest_id):
     """
@@ -140,8 +223,8 @@ def is_quest_active(character, quest_id):
     
     Returns: True if active, False otherwise
     """
-    # TODO: Implement active check
-    pass
+    return quest_id in character.get('active_quests', [])
+
 
 def can_accept_quest(character, quest_id, quest_data_dict):
     """
@@ -150,9 +233,32 @@ def can_accept_quest(character, quest_id, quest_data_dict):
     Returns: True if can accept, False otherwise
     Does NOT raise exceptions - just returns boolean
     """
-    # TODO: Implement requirement checking
-    # Check all requirements without raising exceptions
-    pass
+    # Check quest exists
+    if quest_id not in quest_data_dict:
+        return False
+    
+    quest = quest_data_dict[quest_id]
+    
+    # Check not already completed
+    if is_quest_completed(character, quest_id):
+        return False
+    
+    # Check not already active
+    if is_quest_active(character, quest_id):
+        return False
+    
+    # Check level requirement
+    if character['level'] < quest['required_level']:
+        return False
+    
+    # Check prerequisite
+    prerequisite = quest.get('prerequisite', 'NONE')
+    if prerequisite != 'NONE':
+        if not is_quest_completed(character, prerequisite):
+            return False
+    
+    return True
+
 
 def get_quest_prerequisite_chain(quest_id, quest_data_dict):
     """
@@ -164,10 +270,29 @@ def get_quest_prerequisite_chain(quest_id, quest_data_dict):
     
     Raises: QuestNotFoundError if quest doesn't exist
     """
-    # TODO: Implement prerequisite chain tracing
-    # Follow prerequisite links backwards
-    # Build list in reverse order
-    pass
+    if quest_id not in quest_data_dict:
+        raise QuestNotFoundError(f"Quest '{quest_id}' not found")
+    
+    chain = []
+    current_quest_id = quest_id
+    
+    # Follow prerequisites backwards
+    while current_quest_id is not None:
+        chain.insert(0, current_quest_id)  # Insert at beginning
+        
+        quest = quest_data_dict[current_quest_id]
+        prerequisite = quest.get('prerequisite', 'NONE')
+        
+        if prerequisite == 'NONE':
+            break
+        
+        if prerequisite not in quest_data_dict:
+            raise QuestNotFoundError(f"Prerequisite '{prerequisite}' not found")
+        
+        current_quest_id = prerequisite
+    
+    return chain
+
 
 # ============================================================================
 # QUEST STATISTICS
@@ -179,11 +304,16 @@ def get_quest_completion_percentage(character, quest_data_dict):
     
     Returns: Float between 0 and 100
     """
-    # TODO: Implement percentage calculation
-    # total_quests = len(quest_data_dict)
-    # completed_quests = len(character['completed_quests'])
-    # percentage = (completed / total) * 100
-    pass
+    total_quests = len(quest_data_dict)
+    
+    if total_quests == 0:
+        return 0.0
+    
+    completed_quests = len(character.get('completed_quests', []))
+    percentage = (completed_quests / total_quests) * 100
+    
+    return round(percentage, 2)
+
 
 def get_total_quest_rewards_earned(character, quest_data_dict):
     """
@@ -191,9 +321,22 @@ def get_total_quest_rewards_earned(character, quest_data_dict):
     
     Returns: Dictionary with 'total_xp' and 'total_gold'
     """
-    # TODO: Implement reward calculation
-    # Sum up reward_xp and reward_gold for all completed quests
-    pass
+    total_xp = 0
+    total_gold = 0
+    
+    completed_quest_ids = character.get('completed_quests', [])
+    
+    for quest_id in completed_quest_ids:
+        if quest_id in quest_data_dict:
+            quest = quest_data_dict[quest_id]
+            total_xp += quest.get('reward_xp', 0)
+            total_gold += quest.get('reward_gold', 0)
+    
+    return {
+        'total_xp': total_xp,
+        'total_gold': total_gold
+    }
+
 
 def get_quests_by_level(quest_data_dict, min_level, max_level):
     """
@@ -201,8 +344,15 @@ def get_quests_by_level(quest_data_dict, min_level, max_level):
     
     Returns: List of quest dictionaries
     """
-    # TODO: Implement level filtering
-    pass
+    quests_in_range = []
+    
+    for quest_id, quest in quest_data_dict.items():
+        required_level = quest.get('required_level', 1)
+        if min_level <= required_level <= max_level:
+            quests_in_range.append(quest)
+    
+    return quests_in_range
+
 
 # ============================================================================
 # DISPLAY FUNCTIONS
@@ -214,11 +364,18 @@ def display_quest_info(quest_data):
     
     Shows: Title, Description, Rewards, Requirements
     """
-    # TODO: Implement quest display
     print(f"\n=== {quest_data['title']} ===")
     print(f"Description: {quest_data['description']}")
-    # ... etc
-    pass
+    print(f"Required Level: {quest_data.get('required_level', 1)}")
+    
+    prerequisite = quest_data.get('prerequisite', 'NONE')
+    if prerequisite != 'NONE':
+        print(f"Prerequisite: {prerequisite}")
+    
+    print(f"\nRewards:")
+    print(f"  - XP: {quest_data.get('reward_xp', 0)}")
+    print(f"  - Gold: {quest_data.get('reward_gold', 0)}")
+
 
 def display_quest_list(quest_list):
     """
@@ -226,8 +383,24 @@ def display_quest_list(quest_list):
     
     Shows: Title, Required Level, Rewards
     """
-    # TODO: Implement quest list display
-    pass
+    if not quest_list:
+        print("No quests available.")
+        return
+    
+    print("\n" + "=" * 70)
+    print(f"{'Quest Title':<30} {'Level':<8} {'XP':<8} {'Gold':<8}")
+    print("=" * 70)
+    
+    for quest in quest_list:
+        title = quest.get('title', 'Unknown')[:29]
+        level = quest.get('required_level', 1)
+        xp = quest.get('reward_xp', 0)
+        gold = quest.get('reward_gold', 0)
+        
+        print(f"{title:<30} {level:<8} {xp:<8} {gold:<8}")
+    
+    print("=" * 70)
+
 
 def display_character_quest_progress(character, quest_data_dict):
     """
@@ -239,8 +412,23 @@ def display_character_quest_progress(character, quest_data_dict):
     - Completion percentage
     - Total rewards earned
     """
-    # TODO: Implement progress display
-    pass
+    print("\n=== QUEST PROGRESS ===")
+    
+    active_count = len(character.get('active_quests', []))
+    completed_count = len(character.get('completed_quests', []))
+    total_count = len(quest_data_dict)
+    
+    print(f"Active Quests: {active_count}")
+    print(f"Completed Quests: {completed_count} / {total_count}")
+    
+    completion_pct = get_quest_completion_percentage(character, quest_data_dict)
+    print(f"Completion: {completion_pct}%")
+    
+    rewards = get_total_quest_rewards_earned(character, quest_data_dict)
+    print(f"\nTotal Rewards Earned:")
+    print(f"  - XP: {rewards['total_xp']}")
+    print(f"  - Gold: {rewards['total_gold']}")
+
 
 # ============================================================================
 # VALIDATION
@@ -255,10 +443,16 @@ def validate_quest_prerequisites(quest_data_dict):
     Returns: True if all valid
     Raises: QuestNotFoundError if invalid prerequisite found
     """
-    # TODO: Implement prerequisite validation
-    # Check each quest's prerequisite
-    # Ensure prerequisite exists in quest_data_dict
-    pass
+    for quest_id, quest in quest_data_dict.items():
+        prerequisite = quest.get('prerequisite', 'NONE')
+        
+        if prerequisite != 'NONE':
+            if prerequisite not in quest_data_dict:
+                raise QuestNotFoundError(
+                    f"Quest '{quest_id}' has invalid prerequisite '{prerequisite}'"
+                )
+    
+    return True
 
 
 # ============================================================================

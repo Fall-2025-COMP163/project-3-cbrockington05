@@ -2,9 +2,9 @@
 COMP 163 - Project 3: Quest Chronicles
 Combat System Module - Starter Code
 
-Name: [Your Name Here]
+Name: [Cayden Brockington]
 
-AI Usage: [Document any AI assistance used]
+AI Usage: [ChatGPT helped me format the special abilities classes]
 
 Handles combat mechanics
 """

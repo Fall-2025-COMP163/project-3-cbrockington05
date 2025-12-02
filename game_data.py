@@ -2,9 +2,9 @@
 COMP 163 - Project 3: Quest Chronicles
 Game Data Module - Starter Code
 
-Name: [Your Name Here]
+Name: [Cayden Brockignton]
 
-AI Usage: [Document any AI assistance used]
+AI Usage: [ChatGPT helped me code the loading classes and the a_files class]
 
 This module handles loading and validating game data from text files.
 """

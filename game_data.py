@@ -48,16 +48,23 @@ def load_quests(filename="data/quests.txt"):
     # Split by blank lines
     blocks = [b.strip() for b in data.split('\n\n') if b.strip()]
 
-    quest_dict = {}  # FIXED: was 'qeust.dict'
+    quest_dict = {}  
 
     for block in blocks:
-        lines = block.split('\n')
-        quest_data = parse_quest_block(lines)
-        validate_quest_data(quest_data)
-        quest_dict[quest_data['quest_id']] = quest_data
+        lines = [line.strip() for line in block.splitlines() if line.strip()]
+        try:
+            q = parse_quest_block(lines)
+        except InvalidDataFormatError as e:
+            # for debugging
+            raise InvalidDataFormatError(f"Invalid quest block: {e}")
 
-    return quest_dict  # FIXED: was 'quest_data'
+        quest_id = q["quest_id"]
+        if quest_id in quests:
+            raise InvalidDataFormatError(f"Duplicate quest id '{quest_id}' in file.")
+        quests[quest_id] = q
 
+    return quest_dict 
+    
 
 def load_items(filename="data/items.txt"):
     """
@@ -87,12 +94,19 @@ def load_items(filename="data/items.txt"):
     item_dict = {}
 
     for block in blocks:
-        lines = block.split('\n')
-        item_data = parse_item_block(lines)
-        validate_item_data(item_data)
-        item_dict[item_data['item_id']] = item_data
+        for block in blocks:
+        lines = [line.strip() for line in block.splitlines() if line.strip()]
+        try:
+            itm = parse_item_block(lines)
+        except InvalidDataFormatError as e:
+            raise InvalidDataFormatError(f"Invalid item block: {e}")
 
-    return item_dict
+        item_id = itm["item_id"]
+        if item_id in items:
+            raise InvalidDataFormatError(f"Duplicate item id '{item_id}' in file.")
+        items[item_id] = itm
+
+    return items
 
 
 def validate_quest_data(quest_dict):
@@ -138,18 +152,31 @@ def validate_item_data(item_dict):
     """
     required = ['item_id', 'name', 'type', 'effect', 'cost', 'description']
 
-    for field in required:
-        if field not in item_dict:
-            raise InvalidDataFormatError(f'missing item field: {field}')
+    missing = required - set(item_dict.keys())
+    if missing:
+        raise InvalidDataFormatError(f"Missing item fields: {', '.join(sorted(missing))}")
 
-    # Validate item type
-    valid_types = ['weapon', 'armor', 'consumable']
-    if item_dict['type'] not in valid_types:
-        raise InvalidDataFormatError(f"invalid item type: {item_dict['type']}")  # FIXED: f-string quotes
+    if item_dict["type"] not in ("weapon", "armor", "consumable"):
+        raise InvalidDataFormatError(f"Invalid item type: {item_dict['type']}")
 
-    # Cost must be int
-    if not isinstance(item_dict['cost'], int):
-        raise InvalidDataFormatError('item cost must be an integer')
+    # cost must be int
+    if not isinstance(item_dict.get("cost"), int):
+        raise InvalidDataFormatError("Item field 'cost' must be an integer.")
+
+    # value should be int
+    eff = item_dict["effect"]
+    if ":" not in eff:
+        raise InvalidDataFormatError("Item 'effect' must use format 'stat:value'.")
+
+    stat, val = eff.split(":", 1)
+    stat = stat.strip()
+    val = val.strip()
+    if not stat or not val:
+        raise InvalidDataFormatError("Item 'effect' must contain both stat and value.")
+    try:
+        int(val)
+    except ValueError:
+        raise InvalidDataFormatError("Item effect value must be an integer.")
 
     return True
 
@@ -159,83 +186,69 @@ def create_default_data_files():
     Create default data files if they don't exist
     This helps with initial setup and testing
     """
-    os.makedirs('data', exist_ok=True)
+    data_dir = "data"
+    if not os.path.exists(data_dir):
+        try:
+            os.makedirs(data_dir, exist_ok=True)
+        except Exception as e:
+            raise CorruptedDataError(f"Could not create data directory: {e}")
 
-    # Default quests
-    if not os.path.exists('data/quests.txt'):
-        with open('data/quests.txt', 'w') as f:
-            f.write(
-                'QUEST_ID: first_steps\n'
-                'TITLE: First Steps\n'
-                'DESCRIPTION: Begin your adventure\n'
-                'REWARD_XP: 50\n'
-                'REWARD_GOLD: 25\n'
-                'REQUIRED_LEVEL: 1\n'
-                'PREREQUISITE: NONE\n\n'
-                
-                'QUEST_ID: goblin_slayer\n'
-                'TITLE: Goblin Slayer\n'
-                'DESCRIPTION: Defeat 5 goblins\n'
-                'REWARD_XP: 100\n'
-                'REWARD_GOLD: 50\n'
-                'REQUIRED_LEVEL: 2\n'
-                'PREREQUISITE: first_steps\n\n'
-                
-                'QUEST_ID: treasure_hunter\n'
-                'TITLE: Treasure Hunter\n'
-                'DESCRIPTION: Find the hidden treasure\n'
-                'REWARD_XP: 200\n'
-                'REWARD_GOLD: 100\n'
-                'REQUIRED_LEVEL: 3\n'
-                'PREREQUISITE: goblin_slayer\n'
-            )
+    quests_path = os.path.join(data_dir, "quests.txt")
+    items_path = os.path.join(data_dir, "items.txt")
 
-    # Default items
-    if not os.path.exists('data/items.txt'):
-        with open('data/items.txt', 'w') as f:
-            f.write(
-                'ITEM_ID: health_potion\n'
-                'NAME: Health Potion\n'
-                'TYPE: consumable\n'
-                'EFFECT: heal:50\n'
-                'COST: 50\n'
-                'DESCRIPTION: Restores 50 HP\n\n'
-                
-                'ITEM_ID: rusty_sword\n'
-                'NAME: Rusty Sword\n'
-                'TYPE: weapon\n'
-                'EFFECT: strength:3\n'
-                'COST: 25\n'
-                'DESCRIPTION: A worn but functional sword\n\n'
-                
-                'ITEM_ID: iron_sword\n'
-                'NAME: Iron Sword\n'
-                'TYPE: weapon\n'
-                'EFFECT: strength:5\n'
-                'COST: 100\n'
-                'DESCRIPTION: A basic iron sword\n\n'
-                
-                'ITEM_ID: steel_armor\n'
-                'NAME: Steel Armor\n'
-                'TYPE: armor\n'
-                'EFFECT: defense:10\n'
-                'COST: 150\n'
-                'DESCRIPTION: Strong steel armor\n\n'
-                
-                'ITEM_ID: magic_staff\n'
-                'NAME: Magic Staff\n'
-                'TYPE: weapon\n'
-                'EFFECT: magic:8\n'
-                'COST: 200\n'
-                'DESCRIPTION: A magical staff\n\n'
-                
-                'ITEM_ID: leather_boots\n'
-                'NAME: Leather Boots\n'
-                'TYPE: armor\n'
-                'EFFECT: defense:5\n'
-                'COST: 75\n'
-                'DESCRIPTION: Light leather boots\n'
-            )
+    # Only create if not exists; do not overwrite existing files.
+    if not os.path.exists(quests_path):
+        default_quests = """QUEST_ID: first_quest
+TITLE: First Steps
+DESCRIPTION: Prove yourself by completing this simple task.
+REWARD_XP: 50
+REWARD_GOLD: 25
+REQUIRED_LEVEL: 1
+PREREQUISITE: NONE
+
+QUEST_ID: goblin_menace
+TITLE: Goblin Menace
+DESCRIPTION: Clear out the goblins troubling the nearby farms.
+REWARD_XP: 100
+REWARD_GOLD: 50
+REQUIRED_LEVEL: 2
+PREREQUISITE: first_quest
+"""
+        try:
+            with open(quests_path, "w", encoding="utf-8") as f:
+                f.write(default_quests)
+        except Exception as e:
+            raise CorruptedDataError(f"Could not create default quests file: {e}")
+
+    if not os.path.exists(items_path):
+        default_items = """ITEM_ID: health_potion
+NAME: Health Potion
+TYPE: consumable
+EFFECT: health:30
+COST: 25
+DESCRIPTION: Restores a moderate amount of health.
+
+ITEM_ID: iron_sword
+NAME: Iron Sword
+TYPE: weapon
+EFFECT: strength:5
+COST: 100
+DESCRIPTION: A basic sword that increases strength.
+
+ITEM_ID: leather_armor
+NAME: Leather Armor
+TYPE: armor
+EFFECT: max_health:10
+COST: 80
+DESCRIPTION: Basic armor that increases maximum health.
+"""
+        try:
+            with open(items_path, "w", encoding="utf-8") as f:
+                f.write(default_items)
+        except Exception as e:
+            raise CorruptedDataError(f"Could not create default items file: {e}")
+
+    return True
 
 
 # ============================================================================

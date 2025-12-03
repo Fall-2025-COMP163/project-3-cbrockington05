@@ -11,15 +11,7 @@ This module defines all custom exceptions used throughout the game.
 
 class GameError(Exception):
     """Base exception for all game-related errors"""
-    def __init(self, message = 'An unknown game error occurred.', details):
-        super().__init__(message)
-        self.message = message
-        self.details = details # store extra info for debugging
-    
-    def __str__(self):
-        if self.details:
-            return f'{self.message} | Details: {self.details}'
-        return self.message
+
 
 class DataError(GameError):
     """Base exception for data-related errors"""

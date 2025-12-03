@@ -53,7 +53,7 @@ def create_character(name, character_class):
         'class': character_class,
         'level': 1,
         'health': base['health'],
-        'max_health': base['health'],  # FIXED: was 'max_helath'
+        'max_health': base['health'], 
         'strength': base['strength'],
         'magic': base['magic'],
         'experience': 0,
@@ -97,18 +97,23 @@ def save_character(character, save_directory="data/save_games"):
 
     try:
         with open(filename, 'w') as file:
-            for key in ['name', 'class', 'level', 'health', 'max_health',
-                        'strength', 'magic', 'experience', 'gold']:
-                file.write(f'{key.upper()}: {character[key]}\n')
-
-            file.write(f"INVENTORY: {','.join(character['inventory'])}\n")
-            file.write(f"ACTIVE_QUESTS: {','.join(character['active_quests'])}\n")
-            file.write(f"COMPLETED_QUESTS: {','.join(character['completed_quests'])}\n")
-
-        return True
+             file.write(f"NAME: {character['name']}\n")
+            file.write(f"CLASS: {character['class']}\n")
+            file.write(f"LEVEL: {character['level']}\n")
+            file.write(f"HEALTH: {character['health']}\n")
+            file.write(f"MAX_HEALTH: {character['max_health']}\n")
+            file.write(f"STRENGTH: {character['strength']}\n")
+            file.write(f"MAGIC: {character['magic']}\n")
+            file.write(f"EXPERIENCE: {character['experience']}\n")
+            file.write(f"GOLD: {character['gold']}\n")
+            file.write(f"INVENTORY: {','.join(character['inventory']) if character['inventory'] else ''}\n")
+            file.write(f"ACTIVE_QUESTS: {','.join(character['active_quests']) if character['active_quests'] else ''}\n")
+            file.write(f"COMPLETED_QUESTS: {','.join(character['completed_quests']) if character['completed_quests'] else ''}\n")
 
     except Exception as e:
-        raise e  # FIXED: was incomplete except block
+        raise e  
+
+    return True
 
  
 def load_character(character_name, save_directory="data/save_games"):
@@ -134,7 +139,7 @@ def load_character(character_name, save_directory="data/save_games"):
     try:
         with open(filename, 'r') as file:
             lines = file.readlines()
-    except Exception:
+    except:
         raise SaveFileCorruptedError('Could not read save file')
 
     character = {}
@@ -142,23 +147,28 @@ def load_character(character_name, save_directory="data/save_games"):
     try:
         for line in lines:
             line = line.strip()
-            if not line or ":" not in line:
+            if not line:
                 continue  # Skip empty lines
 
-            key, value = line.split(':', 1)
-            key = key.strip()
-            value = value.strip()
+             if ":" not in line:
+                raise InvalidSaveDataError("Missing ':' in save data")
+            
+            if ": " in line:
+                key, value = line.split(": ", 1)
+            else:
+                key, value = line.split(":", 1)
+                value = value.lstrip()
 
             # Handling list fields
             if key in ['INVENTORY', 'ACTIVE_QUESTS', 'COMPLETED_QUESTS']:
                 character[key.lower()] = value.split(',') if value else []
+             # Convert from str to int
+            elif key in ("LEVEL", "HEALTH", "MAX_HEALTH", "STRENGTH", "MAGIC", "EXPERIENCE", "GOLD"):
+                character[key.lower()] = int(value)
             else:
                 character[key.lower()] = value
 
-        # Convert from str to int
-        numeric_fields = ['level', 'health', 'max_health', 'strength', 'magic', 'experience', 'gold']  # FIXED: was 'numerated_fields'
-        for field in numeric_fields:
-            character[field] = int(character[field])
+        
 
         validate_character_data(character)
         return character
@@ -176,13 +186,13 @@ def list_saved_characters(save_directory="data/save_games"):
     if not os.path.exists(save_directory):
         return []
 
-    characters = []
+    names = []
 
     for filename in os.listdir(save_directory):
-        if filename.endswith('_save.txt'):  # FIXED: added check to only include save files
+        if filename.endswith('_save.txt'): 
             characters.append(filename.replace('_save.txt', ''))
 
-    return characters
+    return names
 
 
 def delete_character(character_name, save_directory="data/save_games"):
@@ -224,19 +234,21 @@ def gain_experience(character, xp_amount):
         raise CharacterDeadError('Dead characters cannot gain experience')
 
     character['experience'] += xp_amount
+    leveled_up = False
 
     # Check if character levels up
     while character['experience'] >= character['level'] * 100:
         character['experience'] -= character['level'] * 100
         character['level'] += 1
-
         # Level up increases
         character['max_health'] += 10
         character['strength'] += 2
         character['magic'] += 2
-
         # Heal to full health when leveling up
         character['health'] = character['max_health']
+        leveled_up = True
+
+    return leveled_up
 
 
 def add_gold(character, amount):
@@ -256,7 +268,7 @@ def add_gold(character, amount):
         raise ValueError('Not enough gold')
 
     character['gold'] = new_total
-    return new_total
+    return character['gold]
 
 
 def heal_character(character, amount):
@@ -267,8 +279,12 @@ def heal_character(character, amount):
     
     Returns: Actual amount healed
     """
+
+    if amount < 0:
+        return 0
+    
     before = character['health']
-    character['health'] = min(character['max_health'], character['health'] + amount)  # FIXED: was missing + operator
+    character['health'] = min(character['health'] + amount, character['max_health'])
     return character['health'] - before
 
 
@@ -287,6 +303,9 @@ def revive_character(character):
     
     Returns: True if revived
     """
+    if not is_character_dead(character):
+        return False
+        
     character['health'] = character['max_health'] // 2
     return True
 
@@ -317,7 +336,7 @@ def validate_character_data(character):
             raise InvalidSaveDataError(f'Missing key: {key}')
 
     # Check numeric fields
-    numeric_fields = ['level', 'health', 'max_health', 'strength',  # FIXED: was 'haelth'
+    numeric_fields = ['level', 'health', 'max_health', 'strength', 
                       'magic', 'experience', 'gold']
     for field in numeric_fields:
         if not isinstance(character[field], int):
